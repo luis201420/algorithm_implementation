@@ -230,7 +230,6 @@ void route(const string &file_name){
 		used_pins[nearest_pin] = 1; // mark used to nearest pin
 		n_usedpins++;
 
-		cout << nearest_pin << "\n";
 	}
 
 	// add L (p1,p2,p3) to tree
@@ -242,8 +241,9 @@ void route(const string &file_name){
 
 void graph_tree(){
 	vv_char  graph(max_X+3, v_char(max_Y+3,' '));
-	cout << max_X << " " << max_Y << "\n";
-	cout << L_tree.size() << "\n";
+	nnumber wirelenght = 0;
+
+	//Add the L's conection in the graphic (*)
 	for(int i=0; i<L_tree.size(); i+=3){
 		for(int k=0;k<2;k++){
 			if(L_tree[i+k][0]==L_tree[i+k+1][0]){
@@ -255,19 +255,22 @@ void graph_tree(){
 					graph[j+1][L_tree[i+k][1]+1]='*';
 		}
 	}
+
+	// Add the pins in the graphic(X)
 	for(int i=0; i<n_pins; i++)
 		graph[my_pins[i].position[0]+1][my_pins[i].position[1]+1]='A'+i;
 	
-
+	// Print graphic
 	for(int i=0; i<graph.size(); i++){
 		for(int j=0;j<graph[i].size();j++){
+			if(graph[i][j]=='*')wirelenght++;
 			if(i==0 || i == graph.size()-1) cout << '-';
 		       	else if(j==0 || j==graph[i].size()-1) cout << '|';
 			else cout << graph[i][j];
 		}
 		cout << "\n";
 	}
-
+	cout << "The wirelenght is: " << wirelenght << ".\n";
 }
 
 /////////////////////////////////////////////////////////////////////////
