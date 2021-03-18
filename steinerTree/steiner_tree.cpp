@@ -63,7 +63,7 @@ pin stringtoPin(const string &my_string){
 }
 
 // Read input file and initializate the list of pins
-void read_file(const string &file_name){
+bool read_file(const string &file_name){
 	
 	ifstream my_stream(file_name);
 	string   line                ;
@@ -81,8 +81,12 @@ void read_file(const string &file_name){
 		n_pins     = my_pins.size();
 
 		cout << "The file content " << n_pins << " pin(s) to route.\n";
+		return 1;
 	}
-	else cout << "Unable to open file.\n";
+	else {
+		cout << "Unable to open file.\n";
+		return 0;
+	}
 }
 
 // Get manhatan distance between points (X,Y)
@@ -187,9 +191,13 @@ void find_nearest_pin_MBB(const vv_nnumber &mbb, nnumber &nearest_pin, v_nnumber
 }
 
 // Main algorithm function
-void route(const string &file_name){
+bool route(const string &file_name){
 	
-	read_file(file_name);
+	bool check_open;
+	check_open = read_file(file_name);
+	
+	if(!check_open)
+		return 0;
 	
 	p_nnumber  nearest_pins;
 	p_nnumber  nearest_pointpin;
@@ -208,7 +216,7 @@ void route(const string &file_name){
 		L_tree.push_back(pos_nearest_pins[0]); 
 		L_tree.push_back({pos_nearest_pins[0][0],pos_nearest_pins[1][1]});
 		L_tree.push_back(pos_nearest_pins[1]);
-		return;
+		return 1;
 	}
 
 	nnumber   nearest_pin;
@@ -237,6 +245,7 @@ void route(const string &file_name){
 	L_tree.push_back({pos_nearest_pins[0][0],pos_nearest_pins[1][1]});
 	L_tree.push_back(pos_nearest_pins[1]);	
 
+	return 1;
 }
 
 void graph_tree(){
@@ -267,6 +276,7 @@ void graph_tree(){
 			if(i==0 || i == graph.size()-1) cout << '-';
 		       	else if(j==0 || j==graph[i].size()-1) cout << '|';
 			else cout << graph[i][j];
+			cout << " ";
 		}
 		cout << "\n";
 	}
@@ -279,8 +289,11 @@ void graph_tree(){
 int main( int argc, char* argv[]){
 	
 	if(argc==2){
-		route(argv[1]);
-		graph_tree();
+		bool check_route = route(argv[1]);
+		if(check_route)
+			graph_tree();
+		else
+			cout << "Error!\n";
 	}
 	else
 		cout << "Error: Be sure to put only the input file name.\n ./steiner_tree file_name_input.txt\n";
