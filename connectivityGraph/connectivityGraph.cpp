@@ -35,7 +35,7 @@ struct Net{                                // Net representation, list of pins
 	string id;
 };
 struct route_region{
-	nnumber n_horizontal, n_vertical;
+	p_nnumber corners[2];
 };
 
 typedef vector<Obstacle> v_obstacle;         // Vector of obstacles
@@ -182,27 +182,26 @@ void get_route_regions(){
 			
 			if(my_layout[i][j] != '-')continue;
 		
-			new_region.n_horizontal = 0;
-			
+			new_region.corners[0] = {i,j};
+
 			for(pos_x=i; pos_x<layout_dimension.first; pos_x++){
 				
 				if(pos_x != i && x_obs[pos_x] == 0)break;
 				
-				new_region.n_horizontal++;
-				new_region.n_vertical = 0;
-
 				for(pos_y=j; pos_y<layout_dimension.second; pos_y++){
 					
 					if(pos_y!=j && y_obs[pos_y]==0)break;
-					new_region.n_vertical++;
-					my_layout[pos_x][pos_y] = 'a'+id_route_region;	
+					my_layout[pos_x][pos_y] = 'a'+id_route_region;
+					new_region.corners[1] = {pos_x, pos_y};
 					if(pos_y!=j && y_obs[pos_y]==1)break;
 				
 				}
 
 				if(pos_x!=i && x_obs[pos_x]==1)break;
 			}
-			
+			cerr << char('a'+id_route_region) << " -> ";
+			cerr << new_region.corners[0].first << " " << new_region.corners[0].second << " ";
+			cerr << new_region.corners[1].first << " " << new_region.corners[1].second << "\n";
 			my_route_regions.push_back(new_region);
 			id_route_region++;
 		}
