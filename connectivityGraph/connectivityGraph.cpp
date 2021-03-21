@@ -24,7 +24,7 @@ struct Pin{                                 // Pin representation, position (X,Y
 };
 
 struct Obstacle{                            // Obstacle representation, 4 corners (Rectangular shape)
-	p_nnumber corners[4];
+	p_nnumber corners[2];
 	string    id;
 };
 
@@ -34,16 +34,25 @@ struct Net{                                // Net representation, list of pins
 	v_pin  pins;
 	string id;
 };
+struct route_region{
+	nnumber n_horizontal, n_vertical;
+};
 
-typedef vector<Obstacle> v_obstacle;       // Vector of obstacles
-typedef vector<Net>      v_net;            // Vector of Nets
+typedef vector<Obstacle> v_obstacle;         // Vector of obstacles
+typedef vector<Net>      v_net;              // Vector of Nets
+typedef vector<char>     v_char;             // Vector of characters
+typedef vector<v_char>   vv_char;            // Matrix 2D of characters
+typedef vector<nnumber>  v_nnumber;          // Vector of normal number
+typedef vector<route_region> v_route_region; // Vector of Route Regions
 
 /////////////////////////////////////////////////////////////////////////
 // Global Variables
 
-p_nnumber  layout_dimension;
-v_obstacle my_obstacles;
-v_net      my_nets;
+p_nnumber       layout_dimension;
+v_obstacle      my_obstacles;
+v_net           my_nets;
+vv_char         my_layout;
+v_route_region  my_route_regions;
 
 /////////////////////////////////////////////////////////////////////////
 // Functions
@@ -86,7 +95,6 @@ bool read_file(const string &file_name){
 				
 				my_stream >> word;                  // read next word
 				layout_dimension = stringToPair(word);
-			
 			}
 			else if(word == word2){                     // Obstacles
 				
@@ -95,7 +103,7 @@ bool read_file(const string &file_name){
 				
 				for(int i = 0; i<n_obs ; i++){
 					
-					for(int j=0; j<5; j++){    // 5 words (ID Corner1 Corner2 Corner3 Corner4)
+					for(int j=0; j<3; j++){    // 3 words (ID Corner1 Corner2)
 						
 						my_stream >> word;
 						
@@ -139,6 +147,69 @@ bool read_file(const string &file_name){
 	}	
 }
 
+// Get route regions of layout, place obstacles and pins into layout(small dimension)
+void get_route_regions(){
+	
+	my_layout.assign(layout_dimension.first, v_char(layout_dimension.second,'-')); // initializate layout
+	v_nnumber x_obs(layout_dimension.first,-1), y_obs(layout_dimension.second,-1);
+
+
+	for(int i=0; i<my_obstacles.size(); i++){
+		
+		x_obs[my_obstacles[i].corners[0].first]  = 0;
+		x_obs[my_obstacles[i].corners[1].first]  = 1;
+		y_obs[my_obstacles[i].corners[0].second] = 0;
+		y_obs[my_obstacles[i].corners[1].second] = 1;
+
+		for(int x=my_obstacles[i].corners[0].first; x<= my_obstacles[i].corners[1].first; x++)
+			for(int y=my_obstacles[i].corners[0].second; y<=my_obstacles[i].corners[1].second; y++)
+				my_layout[x][y]='#';
+
+	}
+
+	for(int i=0; i<my_nets.size();i++){
+		for(int j=0;j<my_nets[i].pins.size(); j++){
+			my_layout[my_nets[i].pins[j].position.first][my_nets[i].pins[j].position.second] = 'A'+i;
+		}
+	}
+
+	nnumber id_route_region = 0;
+	nnumber pos_x, pos_y;
+	route_region new_region;
+
+	for(int i=0; i<layout_dimension.first; i++){
+		for(int j=0; j<layout_dimension.second; j++){
+			
+			if(my_layout[i][j] != '-')continue;
+		
+			new_region.n_horizontal = 0;
+			
+			for(pos_x=i; pos_x<layout_dimension.first; pos_x++){
+				
+				if(pos_x != i && x_obs[pos_x] == 0)break;
+				
+				new_region.n_horizontal++;
+				new_region.n_vertical = 0;
+
+				for(pos_y=j; pos_y<layout_dimension.second; pos_y++){
+					
+					if(pos_y!=j && y_obs[pos_y]==0)break;
+					new_region.n_vertical++;
+					my_layout[pos_x][pos_y] = 'a'+id_route_region;	
+					if(pos_y!=j && y_obs[pos_y]==1)break;
+				
+				}
+
+				if(pos_x!=i && x_obs[pos_x]==1)break;
+			}
+			
+			my_route_regions.push_back(new_region);
+			id_route_region++;
+		}
+	}
+
+}
+
 // Main functions to route
 bool route(const string &file_name){
 	
@@ -149,7 +220,7 @@ bool route(const string &file_name){
 		return 0;
 
 	// Def route regions & connectivity graph
-	
+	get_route_regions();
 
 	// begin route
 	return 1;
@@ -157,6 +228,13 @@ bool route(const string &file_name){
 
 // Graph final layout
 void graph_layout(){
+	for(int i=0; i<layout_dimension.first; i++){
+		for(int j=0; j<layout_dimension.second; j++){
+			//if(islower(my_layout[i][j])) cout << "- ";
+			/*else*/ cout << my_layout[i][j] << " ";
+		}
+		cout << "\n";
+	}
 }
 
 /////////////////////////////////////////////////////////////////////////

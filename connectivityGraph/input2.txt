@@ -1,0 +1,11 @@
+DIMENSION (7,12)
+OBSTACLES 2
+OBS1 (0,0) (2,3)
+OBS2 (4,5) (6,8)
+NETS 2
+NETA 2
+(2,2)
+(5,8)
+NETB 2
+(2,1)
+(4,6)
