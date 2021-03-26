@@ -1,6 +1,6 @@
 NODE 9
 WEIGHT 2
-GOAL a h
+GOAL a i
 a d 1 4
 a b 8 6
 d g 8 8

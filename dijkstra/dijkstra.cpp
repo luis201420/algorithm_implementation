@@ -37,7 +37,7 @@ vv_edge graph;
 string source_node, target_node;            // source and target id node
 map<string, nnumber> ids;                   // ids of nodes on the graph
 v_string names;                             // original names of nodes
-v_nnumber dist_shorest;                     // distance of shorest path
+v_nnumber dist_shorest, shortest_path;      // distance of shorest path
 
 /////////////////////////////////////////////////////////////////////////
 // Functions
@@ -117,18 +117,22 @@ bool read_file(const string &file_name){
 
 // Dijkstra algorithm
 bool dijkstra(){
-	
+
+	// get source and toarget nodes	
 	nnumber source = ids[source_node];
 	nnumber target = ids[target_node];
 
-	v_bool group1(n_nodes+1,1);
-	priority_queue<p_nnumber> group2;
-	v_nnumber parent(n_nodes+1,-1);
-	vv_nnumber dist(n_nodes+1,v_nnumber(n_weights,INF));
+	// initializate the variables for algorithm
+	v_bool group1(n_nodes+1,1);                          // 1 unvisited(group1), 0 visited(group3)
+	priority_queue<p_nnumber> group2;                    // group of explored nodes (group2)
+	v_nnumber parent(n_nodes+1,-1);                      // parent of ist node
+	vv_nnumber dist(n_nodes+1,v_nnumber(n_weights,INF)); // distance of source to ist node
 
+	// initializate values of source node
 	dist[source] = v_nnumber(n_weights,0);
 	group2.push({0,source});
 
+	// aditional variables
 	nnumber cur_node;
 	edge    cur_edge;
 	nnumber cur_cost,new_cost_value;
@@ -136,32 +140,45 @@ bool dijkstra(){
 
 	while(!group2.empty()){
 	
-		cur_node = group2.top().second; group2.pop();
+		cur_node = group2.top().second; group2.pop();  // get the lowest cost node in Group 2
 		
-		if(!group1[cur_node]) continue;
+		if(!group1[cur_node]) continue;                // if node is visited (group3)
 
-		group1[cur_node] = 0;
-		
-		for(int i=0;i<graph[cur_node].size();i++){
+		group1[cur_node] = 0;                          // add node on group 3
+
+		if(cur_node == target) break;                  // if node is a target node
+
+		for(int i=0;i<graph[cur_node].size();i++){     // get all neighbor
 			
+			// get current edge (to_node, weights)
 			cur_edge = graph[cur_node][i];
 			cur_cost = new_cost_value = 0;
 
+			// get new cost to ist neighbor and current cost of ist neighbor
 			for(int j=0;j<n_weights;j++){
 				cur_cost += dist[cur_edge.to_node][j];
 				new_cost[j] = dist[cur_node][j] + cur_edge.weights[j];
 				new_cost_value += new_cost[j];
 			}
+
+			// if cost is less than current cost
 			if(new_cost_value < cur_cost){
-				dist[cur_edge.to_node] = new_cost;
-				group2.push({-new_cost_value,cur_edge.to_node});	
+				parent[cur_edge.to_node] = cur_node;          // update of parent
+				dist[cur_edge.to_node] = new_cost;            // update distance
+				group2.push({-new_cost_value,cur_edge.to_node}); // add node to group2
 			}
 		}
 	}
 	
 	if(group1[target]) return 0;
 
+	
 	dist_shorest = dist[target];
+	while(parent[target]!=-1){
+		shortest_path.push_back(target);
+		target = parent[target];
+	}
+	shortest_path.push_back(target);
 	return 1;
 }
 
@@ -179,6 +196,20 @@ bool route(const string &file_name){
 	return check_route;
 }
 
+// function print the result of route
+void print_shortest_path(){
+	cout << "The shortest path of " << source_node << " to " << target_node << ":\n";
+	for(int i=shortest_path.size()-1; i>=0; i--){
+		cout << names[shortest_path[i]];
+		if(i) cout << "-";
+	}
+	cout << "\nCost of shortest path between " << source_node << " and " << target_node <<" : \n";
+	for(int i=0; i<n_weights;i++)
+		cout << "Weight "<< i << " = " << dist_shorest[i] << "\n";
+
+	cout << "Total cost: " << accumulate(ALL(dist_shorest),0) << "\n";
+}
+
 /////////////////////////////////////////////////////////////////////////
 // Main function
 
@@ -187,11 +218,7 @@ int main(int argc, char* argv[]){
 	if (argc == 2){
 		bool check_route = route(argv[1]);
 		if(check_route){
-			cout << "Cost of shortest path between " << source_node << " and " << target_node <<" : \n";
-			for(int i=0; i<n_weights;i++)
-				cout << "Weight "<< i << " = " << dist_shorest[i] << "\n";
-			
-			cout << "Total cost: " << accumulate(ALL(dist_shorest),0) << "\n";
+			print_shortest_path();
 		}
 		else
 			cout << "Error!\n";
