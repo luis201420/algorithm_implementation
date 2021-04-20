@@ -18,9 +18,11 @@ using namespace std;
 
 typedef int                   nnumber;      // Type normal numbers
 typedef pair<nnumber,nnumber> p_nnumber;    // Pair of normal numbers
+typedef pair<nnumber,char>    p_nnumberchar;// Pair of number and char
 
 struct Pin{                                 // Pin representation, position (X,Y)
 	p_nnumber position;
+	nnumber initial_region;            // initial node of graph
 };
 
 struct Obstacle{                            // Obstacle representation, 4 corners (Rectangular shape)
@@ -36,14 +38,17 @@ struct Net{                                // Net representation, list of pins
 };
 struct route_region{
 	p_nnumber corners[2];
+	p_nnumber tracks;                  // number of {Vertical, horizontal} tracks
 };
 
-typedef vector<Obstacle> v_obstacle;         // Vector of obstacles
-typedef vector<Net>      v_net;              // Vector of Nets
-typedef vector<char>     v_char;             // Vector of characters
-typedef vector<v_char>   vv_char;            // Matrix 2D of characters
-typedef vector<nnumber>  v_nnumber;          // Vector of normal number
-typedef vector<route_region> v_route_region; // Vector of Route Regions
+typedef vector<Obstacle> v_obstacle;            // Vector of obstacles
+typedef vector<Net>      v_net;                 // Vector of Nets
+typedef vector<char>     v_char;                // Vector of characters
+typedef vector<v_char>   vv_char;               // Matrix 2D of characters
+typedef vector<nnumber>  v_nnumber;             // Vector of normal number
+typedef vector<route_region> v_route_region;    // Vector of Route Regions
+typedef vector<p_nnumberchar>  vp_nnumberchar;  // Vector of number-char pairs
+typedef vector<vp_nnumberchar>  vvp_nnumberchar;// Vector of vector of number-char pairs
 
 /////////////////////////////////////////////////////////////////////////
 // Global Variables
@@ -53,6 +58,7 @@ v_obstacle      my_obstacles;
 v_net           my_nets;
 vv_char         my_layout;
 v_route_region  my_route_regions;
+vvp_nnumberchar my_graph;
 
 /////////////////////////////////////////////////////////////////////////
 // Functions
@@ -153,7 +159,7 @@ void get_route_regions(){
 	my_layout.assign(layout_dimension.first, v_char(layout_dimension.second,'-')); // initializate layout
 	v_nnumber x_obs(layout_dimension.first,-1), y_obs(layout_dimension.second,-1);
 
-
+	// Add obstacles on layout
 	for(int i=0; i<my_obstacles.size(); i++){
 		
 		x_obs[my_obstacles[i].corners[0].first]  = 0;
@@ -166,7 +172,8 @@ void get_route_regions(){
 				my_layout[x][y]='#';
 
 	}
-
+	
+	// Add nets on layout
 	for(int i=0; i<my_nets.size();i++){
 		for(int j=0;j<my_nets[i].pins.size(); j++){
 			my_layout[my_nets[i].pins[j].position.first][my_nets[i].pins[j].position.second] = 'A'+i;
@@ -209,6 +216,97 @@ void get_route_regions(){
 
 }
 
+// Get main graph
+void get_graph(){
+	
+	nnumber xp,yp;
+	nnumber x11,x12,y11,y12,x21,x22,y21,y22;
+	my_graph.resize(my_route_regions.size());
+
+	for(int i=0; i<my_route_regions.size();i++){
+		
+		x11 = my_route_regions[i].corners[0].first;
+		x21 = my_route_regions[i].corners[1].first;
+		y11 = my_route_regions[i].corners[0].second;
+		y21 = my_route_regions[i].corners[1].second;
+		
+		my_route_regions[i].tracks = {abs(y11-y21)+1, abs(x11-x21)+1};
+
+		// Get initial node to each pin
+		for(int j=0; j<my_nets.size();j++){
+			for(int k=0;k<my_nets[j].pins.size();k++){
+				xp=my_nets[j].pins[k].position.first;
+				yp=my_nets[j].pins[k].position.second;
+				if(x11<=xp && xp<=x22 && (abs(yp-y11)==1 || abs(yp-y21)==1))
+					my_nets[j].pins[k].initial_region = i;
+				if(y11<=yp && yp<=y22 && (abs(xp-x11)==1 || abs(xp-x21)==1))
+					my_nets[j].pins[k].initial_region = i;
+			}
+		}
+
+		for(int j=i+1;j<my_route_regions.size();j++){
+			
+			x12 = my_route_regions[j].corners[0].first;
+			x22 = my_route_regions[j].corners[1].first;
+			y12 = my_route_regions[j].corners[0].second;
+			y22 = my_route_regions[j].corners[1].second;
+
+			if(x11 == x12 && x21 == x22 && (abs(y11-y22)==1 || abs(y21-y12)==1)){
+				my_graph[i].push_back({j,'H'});
+				my_graph[j].push_back({i,'H'});
+			}
+
+			if(y11 == y12 && y21 == y22 && (abs(x11-x22)==1 || abs(x21-x12)==1)){
+				my_graph[i].push_back({j,'V'});
+				my_graph[j].push_back({i,'V'});
+			}
+		}
+	}
+}
+
+// Route BFS algorithm
+v_nnumber get_path(nnumber source, nnumber target){
+
+	vector<bool> visited(my_route_regions.size(),0);
+	v_nnumber cur_path, new_path;
+	queue<v_nnumber> q;
+	q.push({source});
+	nnumber v,u;
+
+	while(!q.empty()){
+		
+		cur_path = q.front(); q.pop();
+		
+		v = *cur_path.rbegin();
+
+		if(v == target) return cur_path;
+		if(visited[v]) continue;
+
+		visited[v] = 1;
+		//cerr << v << "->";
+		
+		for(int i=0;i<my_graph[v].size();i++){
+
+			u = my_graph[v][i].first;
+			//cerr << u << endl;
+
+			if(my_graph[v][i].second == 'V' && my_route_regions[v].tracks.first && my_route_regions[u].tracks.first){
+				new_path = cur_path;
+				new_path.push_back(u);
+				q.push(new_path);
+			}
+			if(my_graph[v][i].second == 'H' && my_route_regions[v].tracks.second && my_route_regions[u].tracks.second){
+				new_path = cur_path;
+				new_path.push_back(u);
+				q.push(new_path);
+			}
+				
+		}
+	}
+	return v_nnumber();
+
+}
+
 // Main functions to route
 bool route(const string &file_name){
 	
@@ -221,7 +319,20 @@ bool route(const string &file_name){
 	// Def route regions & connectivity graph
 	get_route_regions();
 
+	// Get graph
+	get_graph();
+
+	v_nnumber path;
+
 	// begin route
+	for(int i=0;i<my_nets.size();i++){
+		
+		path = get_path(my_nets[i].pins[0].initial_region, my_nets[i].pins[1].initial_region);
+		//update_layout(path,my_nets[i]);i
+		for(int j=0;j<path.size();j++)
+			cerr << path[j] << " ";
+		cerr << endl;
+	}
 	return 1;
 }
 
