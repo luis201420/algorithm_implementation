@@ -23,6 +23,7 @@ typedef pair<nnumber,char>    p_nnumberchar;// Pair of number and char
 struct Pin{                                 // Pin representation, position (X,Y)
 	p_nnumber position;
 	nnumber initial_region;            // initial node of graph
+	char direction; 		   // direction (vertical or horizontal)
 };
 
 struct Obstacle{                            // Obstacle representation, 4 corners (Rectangular shape)
@@ -206,9 +207,9 @@ void get_route_regions(){
 
 				if(pos_x!=i && x_obs[pos_x]==1)break;
 			}
-			cerr << char('a'+id_route_region) << " -> ";
-			cerr << new_region.corners[0].first << " " << new_region.corners[0].second << " ";
-			cerr << new_region.corners[1].first << " " << new_region.corners[1].second << "\n";
+			//cerr << char('a'+id_route_region) << " -> ";
+			//cerr << new_region.corners[0].first << " " << new_region.corners[0].second << " ";
+			//cerr << new_region.corners[1].first << " " << new_region.corners[1].second << "\n";
 			my_route_regions.push_back(new_region);
 			id_route_region++;
 		}
@@ -237,10 +238,14 @@ void get_graph(){
 			for(int k=0;k<my_nets[j].pins.size();k++){
 				xp=my_nets[j].pins[k].position.first;
 				yp=my_nets[j].pins[k].position.second;
-				if(x11<=xp && xp<=x22 && (abs(yp-y11)==1 || abs(yp-y21)==1))
+				if(x11<=xp && xp<=x21 && (abs(yp-y11)==1 || abs(yp-y21)==1)){
 					my_nets[j].pins[k].initial_region = i;
-				if(y11<=yp && yp<=y22 && (abs(xp-x11)==1 || abs(xp-x21)==1))
+					my_nets[j].pins[k].direction = 'H';
+				}
+				if(y11<=yp && yp<=y21 && (abs(xp-x11)==1 || abs(xp-x21)==1)){
 					my_nets[j].pins[k].initial_region = i;
+					my_nets[j].pins[k].direction = 'V';
+				}
 			}
 		}
 
@@ -265,7 +270,7 @@ void get_graph(){
 }
 
 // Route BFS algorithm
-v_nnumber get_path(nnumber source, nnumber target){
+v_nnumber get_path(nnumber &source, nnumber &target){
 
 	vector<bool> visited(my_route_regions.size(),0);
 	v_nnumber cur_path, new_path;
@@ -307,6 +312,198 @@ v_nnumber get_path(nnumber source, nnumber target){
 
 }
 
+// Update layout
+void update_layout(v_nnumber &path, Net &net, char net_id){
+	
+	char cur_dir;
+	nnumber x1,x2,y1,y2;
+	nnumber x11,x21,y11,y21;
+	nnumber x12,x22,y12,y22;
+	bool ver;
+
+	if(net.pins[0].direction == 'V'){
+		
+		cur_dir = 'V';
+		my_route_regions[path[0]].tracks.first--;
+		
+		x1 = my_route_regions[path[0]].corners[0].first;
+		x2 = my_route_regions[path[0]].corners[1].first;
+
+		y1 = net.pins[0].position.second;
+
+		for(int i=x1;i<=x2;i++) my_layout[i][y1] = net_id;
+		
+	}
+	else{
+		cur_dir = 'H';
+		my_route_regions[path[0]].tracks.second--;
+
+		y1 = my_route_regions[path[0]].corners[0].second;
+		y2 = my_route_regions[path[0]].corners[1].second;
+
+		x1 = net.pins[0].position.first;
+
+		for(int i=y1;i<=y2;i++) my_layout[x1][i] = net_id;
+	}
+
+	for(int i=0;i<path.size()-1;i++){	
+
+			int j = i;
+			ver = 1;
+			
+			while(j<path.size() && ver){
+				
+				x11 = my_route_regions[path[j]].corners[0].first;
+				x21 = my_route_regions[path[j]].corners[1].first;
+				y11 = my_route_regions[path[j]].corners[0].second;
+				y21 = my_route_regions[path[j]].corners[1].second;
+					
+				j++;
+				
+				if(j>=path.size())break;
+
+				x12 = my_route_regions[path[j]].corners[0].first;
+				x22 = my_route_regions[path[j]].corners[1].first;
+				y12 = my_route_regions[path[j]].corners[0].second;
+				y22 = my_route_regions[path[j]].corners[1].second;
+			
+				// H
+				if(x11 == x12 && x21 == x22 && (abs(y11-y22)==1 || abs(y21-y12)==1)){
+					if(cur_dir != 'H'){
+						my_route_regions[path[j-1]].tracks.second--;
+						ver = 0;
+					}
+					my_route_regions[path[j]].tracks.second--;
+				}
+
+				// V
+				if(y11 == y12 && y21 == y22 && (abs(x11-x22)==1 || abs(x21-x12)==1)){
+					if(cur_dir != 'V'){
+						my_route_regions[path[j-1]].tracks.first--;
+						ver = 0;
+					}
+					my_route_regions[path[j]].tracks.first--;
+				}
+			}
+
+			//cerr << i <<" " << j << " " << cur_dir << endl;
+			
+			for(int k=i;k<j;k++){
+				if(i==0){
+					if(cur_dir=='V'){
+						x1 = my_route_regions[path[k]].corners[0].first;
+						x2 = my_route_regions[path[k]].corners[1].first;
+					
+						if(cur_dir == net.pins[0].direction)	
+							y1 = net.pins[0].position.second;
+						else
+							y1 = my_route_regions[path[k]].corners[0].second;
+						
+						while(x1<=x2){
+							my_layout[x1][y1]=net_id;
+							x1++;
+						}
+					}
+					else{
+						y1 = my_route_regions[path[k]].corners[0].second;
+						y2 = my_route_regions[path[k]].corners[1].second;
+						
+						if(cur_dir == net.pins[0].direction)
+							x1 = net.pins[0].position.first;
+						else
+							x1 = my_route_regions[path[k]].corners[0].first;
+
+						while(y1<=y2){
+							my_layout[x1][y1]=net_id;
+							y1++;
+						}
+					}
+				}
+				else if(j==path.size()){
+					if(cur_dir=='V'){
+						x1 = my_route_regions[path[k]].corners[0].first;
+						x2 = my_route_regions[path[k]].corners[1].first;
+						
+						if(cur_dir == net.pins[1].direction)
+							y1 = net.pins[1].position.second;
+						else
+							y1 = my_route_regions[path[k]].corners[0].second;
+						
+						while(x1<=x2){
+							my_layout[x1][y1]=net_id;
+							x1++;
+						}
+					}
+					else{
+						y1 = my_route_regions[path[k]].corners[0].second;
+						y2 = my_route_regions[path[k]].corners[1].second;
+						
+						if(cur_dir == net.pins[1].direction)
+							x1 = net.pins[1].position.first;
+						else
+							x1 = my_route_regions[path[k]].corners[0].first;
+
+						while(y1<=y2){
+							my_layout[x1][y1]=net_id;
+							y1++;
+						}
+					}
+				}
+				else{
+					if(cur_dir=='V'){
+						x1 = my_route_regions[path[k]].corners[0].first;
+						x2 = my_route_regions[path[k]].corners[1].first;
+						
+						y1 = my_route_regions[path[k]].corners[0].second;
+						
+						while(x1<=x2){
+							my_layout[x1][y1]=net_id;
+							x1++;
+						}
+					}
+					else{
+						y1 = my_route_regions[path[k]].corners[0].second;
+						y2 = my_route_regions[path[k]].corners[1].second;
+						
+						x1 = my_route_regions[path[k]].corners[0].first;
+
+						while(y1<=y2){
+							my_layout[x1][y1]=net_id;
+							y1++;
+						}
+					}
+				}
+			}
+
+			if(cur_dir == 'V') cur_dir = 'H';
+			else cur_dir = 'V';
+			i = j-2;
+
+	}
+
+	if(net.pins[1].direction == 'V'){
+		
+		//if(cur_dir != 'V'){
+			my_route_regions[*path.rbegin()].tracks.first--;
+		
+			x1 = my_route_regions[*path.rbegin()].corners[0].first;
+			x2 = my_route_regions[*path.rbegin()].corners[1].first;
+
+			for(int i=x1;i<=x2;i++) my_layout[i][net.pins[1].position.second] = net_id;
+		//}
+	}
+	else{
+		//if(cur_dir != 'H'){
+			my_route_regions[*path.rbegin()].tracks.second--;
+
+			y1 = my_route_regions[*path.rbegin()].corners[0].second;
+			y2 = my_route_regions[*path.rbegin()].corners[1].second;
+
+			for(int i=y1;i<=y2;i++) my_layout[net.pins[1].position.first][i] = net_id;
+		//}
+	}
+}
+
 // Main functions to route
 bool route(const string &file_name){
 	
@@ -328,10 +525,11 @@ bool route(const string &file_name){
 	for(int i=0;i<my_nets.size();i++){
 		
 		path = get_path(my_nets[i].pins[0].initial_region, my_nets[i].pins[1].initial_region);
-		//update_layout(path,my_nets[i]);i
-		for(int j=0;j<path.size();j++)
+		/*for(int j=0;j<path.size();j++)
 			cerr << path[j] << " ";
-		cerr << endl;
+		cerr << endl;*/
+	
+		update_layout(path,my_nets[i],'A'+i);
 	}
 	return 1;
 }
@@ -340,8 +538,9 @@ bool route(const string &file_name){
 void graph_layout(){
 	for(int i=0; i<layout_dimension.first; i++){
 		for(int j=0; j<layout_dimension.second; j++){
+			if('a'<=my_layout[i][j] && my_layout[i][j]<='z') cout << "   ";
 			//if(islower(my_layout[i][j])) cout << "- ";
-			/*else*/ cout << my_layout[i][j] << " ";
+			else cout << my_layout[i][j] << "  ";
 		}
 		cout << "\n";
 	}
