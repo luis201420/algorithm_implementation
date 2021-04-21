@@ -184,7 +184,8 @@ void get_route_regions(){
 	nnumber id_route_region = 0;
 	nnumber pos_x, pos_y;
 	route_region new_region;
-
+	
+	// Get route regions
 	for(int i=0; i<layout_dimension.first; i++){
 		for(int j=0; j<layout_dimension.second; j++){
 			
@@ -224,6 +225,7 @@ void get_graph(){
 	nnumber x11,x12,y11,y12,x21,x22,y21,y22;
 	my_graph.resize(my_route_regions.size());
 
+	// Get connectivity between route regions
 	for(int i=0; i<my_route_regions.size();i++){
 		
 		x11 = my_route_regions[i].corners[0].first;
@@ -231,18 +233,26 @@ void get_graph(){
 		y11 = my_route_regions[i].corners[0].second;
 		y21 = my_route_regions[i].corners[1].second;
 		
+		// Count available tracks on regions
 		my_route_regions[i].tracks = {abs(y11-y21)+1, abs(x11-x21)+1};
 
 		// Get initial node to each pin
 		for(int j=0; j<my_nets.size();j++){
 			for(int k=0;k<my_nets[j].pins.size();k++){
+				
 				xp=my_nets[j].pins[k].position.first;
 				yp=my_nets[j].pins[k].position.second;
+				
+				// if the pin is on the region i (horizontal direction)
 				if(x11<=xp && xp<=x21 && (abs(yp-y11)==1 || abs(yp-y21)==1)){
+				
 					my_nets[j].pins[k].initial_region = i;
 					my_nets[j].pins[k].direction = 'H';
 				}
+
+				// if the pin is on the region i (vertical direction)
 				if(y11<=yp && yp<=y21 && (abs(xp-x11)==1 || abs(xp-x21)==1)){
+				
 					my_nets[j].pins[k].initial_region = i;
 					my_nets[j].pins[k].direction = 'V';
 				}
@@ -255,12 +265,14 @@ void get_graph(){
 			x22 = my_route_regions[j].corners[1].first;
 			y12 = my_route_regions[j].corners[0].second;
 			y22 = my_route_regions[j].corners[1].second;
-
+			
+			// if collide both regions i and j (horizontal side)
 			if(x11 == x12 && x21 == x22 && (abs(y11-y22)==1 || abs(y21-y12)==1)){
 				my_graph[i].push_back({j,'H'});
 				my_graph[j].push_back({i,'H'});
 			}
 
+			// if collide both regions i and j (vertical side)
 			if(y11 == y12 && y21 == y22 && (abs(x11-x22)==1 || abs(x21-x12)==1)){
 				my_graph[i].push_back({j,'V'});
 				my_graph[j].push_back({i,'V'});
@@ -272,6 +284,7 @@ void get_graph(){
 // Route BFS algorithm
 v_nnumber get_path(nnumber &source, nnumber &target){
 
+	// initial variables
 	vector<bool> visited(my_route_regions.size(),0);
 	v_nnumber cur_path, new_path;
 	queue<v_nnumber> q;
@@ -284,7 +297,9 @@ v_nnumber get_path(nnumber &source, nnumber &target){
 		
 		v = *cur_path.rbegin();
 
+		// if target is reached, return the path
 		if(v == target) return cur_path;
+		
 		if(visited[v]) continue;
 
 		visited[v] = 1;
@@ -295,11 +310,13 @@ v_nnumber get_path(nnumber &source, nnumber &target){
 			u = my_graph[v][i].first;
 			//cerr << u << endl;
 
+			// if the conection is vertical and has enough available tracks
 			if(my_graph[v][i].second == 'V' && my_route_regions[v].tracks.first && my_route_regions[u].tracks.first){
 				new_path = cur_path;
 				new_path.push_back(u);
 				q.push(new_path);
 			}
+			// if the conection is horizontal and has enough available tracks
 			if(my_graph[v][i].second == 'H' && my_route_regions[v].tracks.second && my_route_regions[u].tracks.second){
 				new_path = cur_path;
 				new_path.push_back(u);
@@ -321,6 +338,7 @@ void update_layout(v_nnumber &path, Net &net, char net_id){
 	nnumber x12,x22,y12,y22;
 	bool ver;
 
+	// Update the initial route region
 	if(net.pins[0].direction == 'V'){
 		
 		cur_dir = 'V';
@@ -346,11 +364,13 @@ void update_layout(v_nnumber &path, Net &net, char net_id){
 		for(int i=y1;i<=y2;i++) my_layout[x1][i] = net_id;
 	}
 
+	// for each region on shortest path
 	for(int i=0;i<path.size()-1;i++){	
 
 			int j = i;
 			ver = 1;
 			
+			// get region segment with same direction
 			while(j<path.size() && ver){
 				
 				x11 = my_route_regions[path[j]].corners[0].first;
@@ -388,12 +408,16 @@ void update_layout(v_nnumber &path, Net &net, char net_id){
 
 			//cerr << i <<" " << j << " " << cur_dir << endl;
 			
+			// for each region with same direction
 			for(int k=i;k<j;k++){
+				
 				if(i==0){
 					if(cur_dir=='V'){
+						
 						x1 = my_route_regions[path[k]].corners[0].first;
 						x2 = my_route_regions[path[k]].corners[1].first;
-					
+						
+						// if segment is first and has same direction with initial pin, then a track is add on same Y coordenate
 						if(cur_dir == net.pins[0].direction)	
 							y1 = net.pins[0].position.second;
 						else
@@ -407,7 +431,8 @@ void update_layout(v_nnumber &path, Net &net, char net_id){
 					else{
 						y1 = my_route_regions[path[k]].corners[0].second;
 						y2 = my_route_regions[path[k]].corners[1].second;
-						
+					
+						// if segment is first and has same direction with initial pin, then a track is add on same X coordenate	
 						if(cur_dir == net.pins[0].direction)
 							x1 = net.pins[0].position.first;
 						else
@@ -424,6 +449,7 @@ void update_layout(v_nnumber &path, Net &net, char net_id){
 						x1 = my_route_regions[path[k]].corners[0].first;
 						x2 = my_route_regions[path[k]].corners[1].first;
 						
+						// if segment is first and has same direction with end pin, then a track is add on same Y coordenate
 						if(cur_dir == net.pins[1].direction)
 							y1 = net.pins[1].position.second;
 						else
@@ -438,6 +464,7 @@ void update_layout(v_nnumber &path, Net &net, char net_id){
 						y1 = my_route_regions[path[k]].corners[0].second;
 						y2 = my_route_regions[path[k]].corners[1].second;
 						
+						// if segment is first and has same direction with end pin, then a track is add on same X coordenate
 						if(cur_dir == net.pins[1].direction)
 							x1 = net.pins[1].position.first;
 						else
@@ -449,6 +476,7 @@ void update_layout(v_nnumber &path, Net &net, char net_id){
 						}
 					}
 				}
+				// if the segment neither initial or end
 				else{
 					if(cur_dir=='V'){
 						x1 = my_route_regions[path[k]].corners[0].first;
@@ -481,26 +509,23 @@ void update_layout(v_nnumber &path, Net &net, char net_id){
 
 	}
 
+	// Add tracks on layout on final region
 	if(net.pins[1].direction == 'V'){
 		
-		//if(cur_dir != 'V'){
-			my_route_regions[*path.rbegin()].tracks.first--;
+		my_route_regions[*path.rbegin()].tracks.first--;
 		
-			x1 = my_route_regions[*path.rbegin()].corners[0].first;
-			x2 = my_route_regions[*path.rbegin()].corners[1].first;
+		x1 = my_route_regions[*path.rbegin()].corners[0].first;	
+		x2 = my_route_regions[*path.rbegin()].corners[1].first;
 
-			for(int i=x1;i<=x2;i++) my_layout[i][net.pins[1].position.second] = net_id;
-		//}
+		for(int i=x1;i<=x2;i++) my_layout[i][net.pins[1].position.second] = net_id;
 	}
 	else{
-		//if(cur_dir != 'H'){
-			my_route_regions[*path.rbegin()].tracks.second--;
+		my_route_regions[*path.rbegin()].tracks.second--;
 
-			y1 = my_route_regions[*path.rbegin()].corners[0].second;
-			y2 = my_route_regions[*path.rbegin()].corners[1].second;
+		y1 = my_route_regions[*path.rbegin()].corners[0].second;
+		y2 = my_route_regions[*path.rbegin()].corners[1].second;
 
-			for(int i=y1;i<=y2;i++) my_layout[net.pins[1].position.first][i] = net_id;
-		//}
+		for(int i=y1;i<=y2;i++) my_layout[net.pins[1].position.first][i] = net_id;
 	}
 }
 
@@ -525,6 +550,7 @@ bool route(const string &file_name){
 	for(int i=0;i<my_nets.size();i++){
 		
 		path = get_path(my_nets[i].pins[0].initial_region, my_nets[i].pins[1].initial_region);
+		
 		/*for(int j=0;j<path.size();j++)
 			cerr << path[j] << " ";
 		cerr << endl;*/
@@ -538,9 +564,11 @@ bool route(const string &file_name){
 void graph_layout(){
 	for(int i=0; i<layout_dimension.first; i++){
 		for(int j=0; j<layout_dimension.second; j++){
+			
 			if('a'<=my_layout[i][j] && my_layout[i][j]<='z') cout << "   ";
 			//if(islower(my_layout[i][j])) cout << "- ";
 			else cout << my_layout[i][j] << "  ";
+		
 		}
 		cout << "\n";
 	}
